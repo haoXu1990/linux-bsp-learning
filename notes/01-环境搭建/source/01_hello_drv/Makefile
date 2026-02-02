@@ -9,7 +9,7 @@
 #   不能用普通 gcc 直接编译成用户态可执行文件，否则就会出现 “linux/module.h: No such file”。
 
 # 可在命令行覆盖：make KERN_DIR=/path/to/kernel
-KERN_DIR = /home/xuhao/work/100ask/eLinuxCore_100ask-t113-pro/linux
+KERN_DIR = /home/xuhao/work/100ask/buildroot_100ask_t113-pro/buildroot/output/build/linux-origin_master
 PWD := $(shell pwd)
 
 all:

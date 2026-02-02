@@ -1,0 +1,1 @@
+cmd_/home/xuhao/work/100ask/linux-bsp-learning/notes/01-环境搭建/source/01_hello_drv/hello_drv.mod := { echo  /home/xuhao/work/100ask/linux-bsp-learning/notes/01-环境搭建/source/01_hello_drv/hello_drv.o; echo; } > /home/xuhao/work/100ask/linux-bsp-learning/notes/01-环境搭建/source/01_hello_drv/hello_drv.mod
