@@ -4,7 +4,7 @@
 
 ## 1. 实现流程
 基于原始的裸GPIO驱动方式，控制 `USER_LED1` 和 `USER_LED2` 的状态。
-流程 echo 1 > /dev/gpiodrv
+
 
 ## 2. 信息确认
 根据硬件电路，确认芯片引脚，GPIO 组，GPIO 号，引脚方向，引脚模式，引脚值。
@@ -72,7 +72,7 @@ printf '\x00\x01' > /dev/gpio_led
 ```
 
 ## FQA
-1.  安装驱动失败，PD22 引脚已经在使用
+1.  gpio_request failed
 ``` 
 shell
 
