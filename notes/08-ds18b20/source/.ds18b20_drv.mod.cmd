@@ -1,0 +1,1 @@
+cmd_/home/xuhao/work/100ask/linux-bsp-learning/notes/08-ds18b20/source/ds18b20_drv.mod := { echo  /home/xuhao/work/100ask/linux-bsp-learning/notes/08-ds18b20/source/ds18b20_drv.o; echo; } > /home/xuhao/work/100ask/linux-bsp-learning/notes/08-ds18b20/source/ds18b20_drv.mod

@@ -11,8 +11,8 @@ KERN_DIR = /home/xuhao/work/100ask/buildroot_100ask_t113-pro/buildroot/output/bu
 PWD := $(shell pwd)
 all:
 	make -C $(KERN_DIR) M=$(PWD) modules
-	$(CROSS_COMPILE)gcc -o  ds18b20_drv.c
+		$(CROSS_COMPILE)gcc -o ds18b20_drv_app ds18b20_drv_app.c
 clean:
 	make -C $(KERN_DIR) M=$(PWD) modules clean
-
+	rm -rf modules.order  ds18b20_drv_app
 obj-m += ds18b20_drv.o
