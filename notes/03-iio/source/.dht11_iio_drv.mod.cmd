@@ -1,0 +1,1 @@
+cmd_/home/xuhao/work/100ask/linux-bsp-learning/notes/03-iio/source/dht11_iio_drv.mod := { echo  /home/xuhao/work/100ask/linux-bsp-learning/notes/03-iio/source/dht11_iio_drv.o; echo; } > /home/xuhao/work/100ask/linux-bsp-learning/notes/03-iio/source/dht11_iio_drv.mod
