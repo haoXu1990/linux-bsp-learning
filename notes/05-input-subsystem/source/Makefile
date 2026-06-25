@@ -13,9 +13,11 @@ all:
 	mkdir -p $(OUT_DIR)
 	make -C $(KERN_DIR) M=$(PWD) modules
 	cp *.ko $(OUT_DIR)
+	$(CROSS_COMPILE)gcc -o input_power_reboot_app input_power_reboot_app.c
+	cp input_power_reboot_app $(OUT_DIR)
 
 clean:
 	make -C $(KERN_DIR) M=$(PWD) modules clean
-	rm -rf $(OUT_DIR)
+	rm -rf $(OUT_DIR) input_power_reboot_app
 
 obj-m += gpio_longpress_reboot.o

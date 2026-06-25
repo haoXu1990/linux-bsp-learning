@@ -5,183 +5,197 @@
 #include <linux/interrupt.h>
 #include <linux/jiffies.h>
 #include <linux/module.h>
-#include <linux/reboot.h>
+#include <linux/of.h>
+#include <linux/of_gpio.h>
+#include <linux/platform_device.h>
+#include <linux/slab.h>
 #include <linux/string.h>
-#include <linux/workqueue.h>
 
-static int key_gpio = 103;
-module_param(key_gpio, int, 0644);
-MODULE_PARM_DESC(key_gpio, "GPIO number used as the power key");
+#define DEBOUNCE_MS 20
 
-static bool active_low;
-module_param(active_low, bool, 0644);
-MODULE_PARM_DESC(active_low, "Set to true when the key is active low");
-
-static unsigned int press_ms = 3000;
-module_param(press_ms, uint, 0644);
-MODULE_PARM_DESC(press_ms, "Long press timeout in milliseconds");
-
-struct gpio_power_key {
-	int gpio;
-	int irq;
-	bool pressed;
-	bool reboot_sent;
-	struct input_dev *input;
-	struct delayed_work longpress_work;
+/*
+ * 驱动数据结构。
+ */
+struct input_dev_demo {
+  int gpio;
+  int irq;
+  bool active_low;
+  bool pressed;
+  unsigned long last_jiffies;
+  struct input_dev *input_dev;
 };
 
-static struct gpio_power_key power_key;
+static struct input_dev *g_input_dev;
+static int g_irq;
 
-static bool gpio_power_key_is_pressed(struct gpio_power_key *key)
-{
-	int value = gpio_get_value(key->gpio);
+// 读取 GPIO 电平，然后转换成“按键是否按下”
+static bool input_dev_key_is_pressed(struct input_dev_demo *demo) {
+  int value = gpio_get_value(demo->gpio);
 
-	return active_low ? !value : !!value;
+  // 如果设备树里写的是低电平有效，那么读到 0 才表示按下
+  //  这里一定要注意设备树中的配置
+  return demo->active_low ? !value : !!value;
 }
 
-static void gpio_power_key_report(struct gpio_power_key *key, bool pressed)
-{
-	input_report_key(key->input, KEY_POWER, pressed);
-	input_sync(key->input);
+//GPIO 中断处理函数：按下和松开都会进来
+static irqreturn_t input_dev_irq_handler(int irq, void *dev_id) {
+  struct input_dev_demo *demo = dev_id;
+  unsigned long now = jiffies;
+  bool pressed = input_dev_key_is_pressed(demo);
+
+  // 简单去抖，20ms 内的变化先忽略掉
+  if (time_before(now, demo->last_jiffies + msecs_to_jiffies(DEBOUNCE_MS)))
+    return IRQ_HANDLED;
+
+  /* 如果状态没变化，可能是抖动或者重复中断，直接忽略 */
+  if (pressed == demo->pressed)
+    return IRQ_HANDLED;
+
+  demo->last_jiffies = now;
+  demo->pressed = pressed;
+
+  // 上报 input 事件
+  input_report_key(demo->input_dev, KEY_POWER, pressed);
+
+  printk("input_dev_demo: report inpt key ret = %d\n", pressed);
+  // sync 事件
+  input_sync(demo->input_dev);
+
+  return IRQ_HANDLED;
 }
 
-static void gpio_power_key_longpress_work(struct work_struct *work)
-{
-	struct gpio_power_key *key =
-		container_of(to_delayed_work(work), struct gpio_power_key,
-			     longpress_work);
+/* 设备树匹配成功后，内核会调用 probe */
+static int input_dev_probe(struct platform_device *pdev) {
+  struct input_dev_demo *demo;
+  enum of_gpio_flags flags;
+  int ret;
 
-	if (!gpio_power_key_is_pressed(key))
-		return;
+  /* 申请驱动数据结构 */
+  demo = kzalloc(sizeof(*demo), GFP_KERNEL);
+  if (!demo)
+    return -EINVAL;
 
-	if (key->reboot_sent)
-		return;
+  // 从设备树的 gpios 属性里拿到 GPIO
+  demo->gpio = of_get_named_gpio_flags(pdev->dev.of_node, "gpios", 0, &flags);
+  if (!gpio_is_valid(demo->gpio)) {
+    ret = demo->gpio;
+    printk("input_dev_demo: get gpio failed, ret = %d\n", ret);
+    return  -EINVAL;
+  }
 
-	key->reboot_sent = true;
+  demo->active_low = flags & OF_GPIO_ACTIVE_LOW;
 
-	pr_info("gpio_longpress_reboot: long press detected, call ctrl_alt_del\n");
 
-	gpio_power_key_report(key, true);
-	gpio_power_key_report(key, false);
+  // 申请 GPIO
+  ret = gpio_request(demo->gpio, "input_dev_demo_key");
+  if (ret) {
+    printk("input_dev_demo: gpio_request failed, ret = %d\n", ret);
+    return -EINVAL;
+  }
 
-	ctrl_alt_del();
+  // 设置方向
+  ret = gpio_direction_input(demo->gpio);
+  if (ret) {
+    printk("input_dev_demo: gpio_direction_input failed, ret = %d\n", ret);
+    return -EINVAL;
+  }
+
+  // 获取 中端
+  demo->irq = platform_get_irq(pdev, 0);
+  if (demo->irq < 0) {
+    ret = demo->irq;
+    printk("input_dev_demo: get irq failed, ret = %d\n", ret);
+    return -EINVAL;
+  }
+
+  // 创建一个 input 设备
+  // devm 开头的好像是自动管理资源
+  demo->input_dev = input_allocate_device();
+  if (!demo->input_dev) {
+      return -EINVAL;
+  }
+
+  // 可有可无
+  demo->input_dev->name = "input_dev_demo";
+  demo->input_dev->phys = "input_dev_demo/input0";
+  demo->input_dev->id.bustype = BUS_HOST;
+
+  // 设置支持的输入事件：电源键
+  input_set_capability(demo->input_dev, EV_KEY, KEY_POWER);
+
+  // 注册 input 设备
+  ret = input_register_device(demo->input_dev);
+  if (ret) {
+    printk("input_dev_demo: input_register_device failed, ret = %d\n", ret);
+    return -EINVAL;
+  }
+
+  demo->pressed = input_dev_key_is_pressed(demo);
+  demo->last_jiffies = jiffies;
+
+  // 申请 GPIO 中断
+  ret = request_irq(demo->irq, input_dev_irq_handler,
+                    IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+                    "input_dev_demo", demo);
+  if (ret) {
+    printk("input_dev_demo: request_irq failed, ret = %d\n", ret);
+    return -EINVAL;
+  }
+
+  /* 保存一下，remove 的时候可以取回来 */
+  g_input_dev = demo->input_dev;
+  g_irq = demo->irq;
+  platform_set_drvdata(pdev, demo);
+
+  printk("input_dev_demo: probe ok, gpio = %d, irq = %d\n", demo->gpio,
+         demo->irq);
+
+  return 0;
 }
 
-static irqreturn_t gpio_power_key_irq(int irq, void *dev_id)
-{
-	struct gpio_power_key *key = dev_id;
-	bool pressed = gpio_power_key_is_pressed(key);
 
-	if (pressed == key->pressed)
-		return IRQ_HANDLED;
+static int input_dev_remove(struct platform_device *pdev) {
+  struct input_dev_demo *demo = platform_get_drvdata(pdev);
 
-	key->pressed = pressed;
+  // 释放probe 中申请的资源
+  free_irq(demo->irq, demo);
+  input_unregister_device(demo->input_dev);
+  gpio_free(demo->gpio);
+  kfree(demo);
 
-	gpio_power_key_report(key, pressed);
+  g_input_dev = NULL;
+  g_irq = 0;
 
-	if (pressed) {
-		key->reboot_sent = false;
-		schedule_delayed_work(&key->longpress_work,
-				      msecs_to_jiffies(press_ms));
-	} else {
-		cancel_delayed_work(&key->longpress_work);
-	}
-
-	return IRQ_HANDLED;
+  return 0;
 }
 
-static int __init gpio_longpress_reboot_init(void)
-{
-	int ret;
 
-	memset(&power_key, 0, sizeof(power_key));
-	power_key.gpio = key_gpio;
+static const struct of_device_id input_dev_of_match[] = {
+    {.compatible = "100ask,input_dev_demo"}, {}};
 
-	ret = gpio_request(power_key.gpio, "gpio_longpress_reboot");
-	if (ret) {
-		pr_err("gpio_longpress_reboot: gpio_request(%d) failed: %d\n",
-		       power_key.gpio, ret);
-		return ret;
-	}
+MODULE_DEVICE_TABLE(of, input_dev_of_match);
 
-	ret = gpio_direction_input(power_key.gpio);
-	if (ret) {
-		pr_err("gpio_longpress_reboot: gpio_direction_input failed: %d\n",
-		       ret);
-		goto err_free_gpio;
-	}
+// 注册 platform_drive
+static struct platform_driver input_dev_driver = {
+    .probe = input_dev_probe,
+    .remove = input_dev_remove,
+    .driver = {
+        .name = "input_dev_demo",
+        .of_match_table = input_dev_of_match,
+    }};
 
-	power_key.irq = gpio_to_irq(power_key.gpio);
-	if (power_key.irq < 0) {
-		ret = power_key.irq;
-		pr_err("gpio_longpress_reboot: gpio_to_irq failed: %d\n", ret);
-		goto err_free_gpio;
-	}
-
-	power_key.input = input_allocate_device();
-	if (!power_key.input) {
-		ret = -ENOMEM;
-		goto err_free_gpio;
-	}
-
-	power_key.input->name = "gpio-longpress-reboot";
-	power_key.input->phys = "gpio-longpress-reboot/input0";
-	power_key.input->id.bustype = BUS_HOST;
-	input_set_capability(power_key.input, EV_KEY, KEY_POWER);
-
-	ret = input_register_device(power_key.input);
-	if (ret) {
-		pr_err("gpio_longpress_reboot: input_register_device failed: %d\n",
-		       ret);
-		goto err_free_input;
-	}
-
-	INIT_DELAYED_WORK(&power_key.longpress_work,
-			  gpio_power_key_longpress_work);
-
-	power_key.pressed = gpio_power_key_is_pressed(&power_key);
-
-	ret = request_irq(power_key.irq, gpio_power_key_irq,
-			  IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
-			  "gpio_longpress_reboot", &power_key);
-	if (ret) {
-		pr_err("gpio_longpress_reboot: request_irq failed: %d\n", ret);
-		goto err_unregister_input;
-	}
-
-	pr_info("gpio_longpress_reboot: gpio=%d irq=%d active_low=%d press_ms=%u\n",
-		power_key.gpio, power_key.irq, active_low, press_ms);
-
-	return 0;
-
-err_unregister_input:
-	input_unregister_device(power_key.input);
-	power_key.input = NULL;
-	goto err_free_gpio;
-err_free_input:
-	input_free_device(power_key.input);
-	power_key.input = NULL;
-err_free_gpio:
-	gpio_free(power_key.gpio);
-	return ret;
+static int __init input_dev_init(void) {
+  return platform_driver_register(&input_dev_driver);
 }
 
-static void __exit gpio_longpress_reboot_exit(void)
-{
-	free_irq(power_key.irq, &power_key);
-	cancel_delayed_work_sync(&power_key.longpress_work);
+static void __exit input_dev_exit(void) {
 
-	if (power_key.input)
-		input_unregister_device(power_key.input);
-
-	gpio_free(power_key.gpio);
-
-	pr_info("gpio_longpress_reboot: exit\n");
+  platform_driver_unregister(&input_dev_driver);
 }
 
-module_init(gpio_longpress_reboot_init);
-module_exit(gpio_longpress_reboot_exit);
+module_init(input_dev_init);
+module_exit(input_dev_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("XuHao");
-MODULE_DESCRIPTION("GPIO long press reboot input driver");
+MODULE_DESCRIPTION("input driver");

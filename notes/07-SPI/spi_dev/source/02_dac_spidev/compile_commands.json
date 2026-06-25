@@ -1,0 +1,15 @@
+[
+    {
+        "arguments": [
+            "arm-buildroot-linux-gnueabihf-gcc",
+            "-c",
+            "-Wall",
+            "-Iinclude",
+            "-o",
+            "dac_test",
+            "dac_test.c"
+        ],
+        "directory": "/home/xuhao/work/100ask/linux-bsp-learning/notes/07-SPI/spi_dev/source/02_dac_spidev",
+        "file": "dac_test.c"
+    }
+]

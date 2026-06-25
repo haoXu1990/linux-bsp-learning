@@ -15,26 +15,13 @@
 
 ### `/dev/v4l-subdevX`
 
-用于直接操作某个子模块，常见于复杂 SoC pipeline：
-
-- 获取/设置某个 pad 的 media bus format。
-- crop/compose selection。
-- frame interval。
-- 私有或标准 subdev ioctl。
-
-普通采集 APP 不应仅凭编号猜测哪个节点是 Sensor，应从 media topology 查找 entity 与设备节点的对应关系。
+暂时没关注
 
 ### `/dev/mediaX`
 
-用于查看和配置媒体拓扑：
+暂时没关注
 
-- 枚举 entity、pad、link。
-- 启用或禁用可配置 link。
-- 获取完整 topology。
-
-它本身不承载视频帧。
-
-## 2. 一次典型 MMAP 采集
+## 2. 采集流程
 
 ```mermaid
 sequenceDiagram
@@ -79,14 +66,12 @@ fd = open("/dev/video0", O_RDWR | O_NONBLOCK);
 
 ### 2.2 `VIDIOC_QUERYCAP`
 
-先判断设备类型和 I/O 能力：
+判断设备类型和 I/O 能力：
 
 ```c
 struct v4l2_capability cap = {0};
 ioctl(fd, VIDIOC_QUERYCAP, &cap);
 ```
-
-Linux 4.9 中应注意 `V4L2_CAP_DEVICE_CAPS`：如果该位存在，应主要检查 `cap.device_caps`，否则检查 `cap.capabilities`。
 
 常见能力：
 
@@ -100,12 +85,7 @@ Linux 4.9 中应注意 `V4L2_CAP_DEVICE_CAPS`：如果该位存在，应主要�
 ```text
 VIDIOC_ENUM_FMT          枚举像素格式
 VIDIOC_ENUM_FRAMESIZES   枚举指定格式的分辨率
-VIDIOC_ENUM_FRAMEINTERVALS 枚举格式+分辨率支持的帧间隔
-VIDIOC_QUERYCTRL         查询 control
-VIDIOC_QUERYMENU         查询菜单项
 ```
-
-枚举直到 ioctl 返回 `EINVAL`，通常表示 index 已越界。
 
 ### 2.4 `TRY_FMT` 与 `S_FMT`
 
@@ -119,15 +99,12 @@ fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 fmt.fmt.pix.width = 640;
 fmt.fmt.pix.height = 480;
 fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
-fmt.fmt.pix.field = V4L2_FIELD_NONE;
 
 if (ioctl(fd, VIDIOC_S_FMT, &fmt) < 0)
     /* error */;
 
 /* 后续必须使用驱动返回的 fmt，而非原始请求值 */
 ```
-
-通常不允许在 queue busy 或 streaming 时修改格式。
 
 ### 2.5 `REQBUFS`
 
@@ -278,20 +255,8 @@ ioctl(fd, VIDIOC_S_CTRL, &c);
 
 复杂和批量 control 更适合 `VIDIOC_G_EXT_CTRLS` / `VIDIOC_S_EXT_CTRLS`。
 
-## 7. 对照本仓库实验
+## 7. FQA
+### 1. Buffer Count 的疑问
 
-可结合 [`../v4l2_camera_view/README.md`](../v4l2_camera_view/README.md) 和 `main.c` 阅读：
+为什么视频中介绍的 buffer 申请数量是 4？ 应该跟 Audio 的buffer 一样要有一个采样率、bit 等等一个计算公式才合理？
 
-```text
-open camera
-→ query/set format
-→ reqbufs/querybuf/mmap
-→ qbuf all
-→ streamon
-→ poll/dqbuf
-→ YUYV 转 RGB
-→ 写 framebuffer
-→ qbuf
-```
-
-下一篇：[V4L2 Core 设备模型与 ioctl 调用链](02-V4L2-Core设备模型与ioctl调用链.md)。

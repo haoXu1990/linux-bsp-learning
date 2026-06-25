@@ -1,0 +1,14 @@
+[
+    {
+        "arguments": [
+            "arm-buildroot-linux-gnueabihf-gcc",
+            "-c",
+            "-I/home/xuhao/work/100ask/linux-bsp-learning/notes/08-usb/usb-hid/include",
+            "-o",
+            "usb_hid_mouse",
+            "usb_hid_mouse.c"
+        ],
+        "directory": "/home/xuhao/work/100ask/linux-bsp-learning/notes/08-usb/usb-hid",
+        "file": "usb_hid_mouse.c"
+    }
+]

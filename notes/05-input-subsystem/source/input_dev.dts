@@ -1,0 +1,12 @@
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/interrupt-controller/irq.h>
+
+/ {
+	gpio_power_key {
+		compatible = "100ask,input_dev_demo";
+		gpios = <&pio PD 7 GPIO_ACTIVE_LOW>;
+		interrupt-parent = <&pio>;
+		interrupts = <PD 7 IRQ_TYPE_EDGE_BOTH>;
+		status = "okay";
+	};
+};

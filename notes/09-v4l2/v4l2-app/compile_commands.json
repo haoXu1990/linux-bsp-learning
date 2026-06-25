@@ -1,0 +1,13 @@
+[
+    {
+        "arguments": [
+            "arm-buildroot-linux-gnueabihf-gcc",
+            "-c",
+            "-o",
+            "v4l2_app",
+            "v4l2_app.c"
+        ],
+        "directory": "/home/xuhao/work/100ask/linux-bsp-learning/notes/09-v4l2/v4l2-app",
+        "file": "v4l2_app.c"
+    }
+]
