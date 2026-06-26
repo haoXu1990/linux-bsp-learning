@@ -15,7 +15,7 @@
 
 ### `/dev/v4l-subdevX`
 
-暂时没关注
+暂时没关注,  这个应该是控制节点？
 
 ### `/dev/mediaX`
 
@@ -108,7 +108,7 @@ if (ioctl(fd, VIDIOC_S_FMT, &fmt) < 0)
 
 ### 2.5 `REQBUFS`
 
-```c
+```shel
 struct v4l2_requestbuffers req = {
     .count = 4,
     .type = V4L2_BUF_TYPE_VIDEO_CAPTURE,
@@ -140,7 +140,7 @@ addr = mmap(NULL, buf.length, PROT_READ | PROT_WRITE,
 
 `VIDIOC_QBUF` 的本质是所有权交接：
 
-```text
+```shell
 APP 拥有并可处理
     │ QBUF
     ▼
@@ -156,16 +156,11 @@ enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 ioctl(fd, VIDIOC_STREAMON, &type);
 ```
 
-通常要求已经排入足够 buffer。vb2 会把排队的 buffer 交给驱动并调用 `start_streaming`。具体驱动才会真正：
-
-- 提交 USB URB。
-- 启动 Sensor/CSI/ISP。
-- 配置并启动 DMA。
-- 启动虚拟帧定时器或内核线程。
+vb2 会把排队的 buffer 交给驱动并调用 `start_streaming`。具体流程没跟。
 
 ### 2.9 `poll + DQBUF`
 
-```c
+```shell
 struct pollfd pfd = { .fd = fd, .events = POLLIN };
 if (poll(&pfd, 1, 1000) > 0) {
     struct v4l2_buffer b = {
@@ -212,16 +207,7 @@ stateDiagram-v2
 - DQBUF 后，APP重新获得 buffer。
 - APP 如果不重新 QBUF，可供硬件使用的 buffer 会越来越少。
 
-## 4. 四种 I/O 模型
-
-| 模型 | 内存来源 | 典型用途 |
-| --- | --- | --- |
-| read/write | 驱动内部队列，read 时复制 | 简单、低帧率或兼容路径 |
-| MMAP | 驱动/vb2 分配，映射给 APP | 最常见的采集方式 |
-| USERPTR | APP 分配并在 QBUF 时传地址 | 老式共享方案，驱动支持度不一 |
-| DMABUF | 外部 exporter 分配，通过 fd 共享 | 摄像头、GPU、编解码、显示之间共享 |
-
-## 5. 单平面与多平面
+## 4. 单平面与多平面
 
 “多平面”指 API 表达方式，不应简单等同于 YUV 有多个颜色分量。
 
@@ -240,12 +226,12 @@ stateDiagram-v2
 
 APP 必须根据 capability 和 queue type 使用对应 API，不能混用。
 
-## 6. Controls 与 format 不一样
+## 5. controls 与 format 的区别
 
 - format 决定数据布局：宽、高、FourCC、stride、sizeimage。
-- control 调整设备行为：曝光、增益、白平衡、亮度、翻转。
+- control 调整设备行为：曝光、增益、白平衡、亮度、翻转。这部分因该是手机业务会大量用
 
-```c
+```shel
 struct v4l2_control c = {
     .id = V4L2_CID_BRIGHTNESS,
     .value = 128,
@@ -253,9 +239,7 @@ struct v4l2_control c = {
 ioctl(fd, VIDIOC_S_CTRL, &c);
 ```
 
-复杂和批量 control 更适合 `VIDIOC_G_EXT_CTRLS` / `VIDIOC_S_EXT_CTRLS`。
-
-## 7. FQA
+## 6. FQA
 ### 1. Buffer Count 的疑问
 
 为什么视频中介绍的 buffer 申请数量是 4？ 应该跟 Audio 的buffer 一样要有一个采样率、bit 等等一个计算公式才合理？

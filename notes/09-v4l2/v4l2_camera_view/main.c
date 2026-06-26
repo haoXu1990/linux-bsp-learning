@@ -408,7 +408,7 @@ int main(int argc, char **argv)
     // }
 
     /*
-     * 步骤 1.2： 这里好像也不是必须的
+     * 步骤 1.2：z
      * 当前 100ask mxsfb overlay_fb_ops 没有实现 .fb_ioctl，这个 ioctl 可能失败。
      * 失败只打印提示，不中断流程；真正关键的是上面的 FBIOBLANK unblank。
      */
