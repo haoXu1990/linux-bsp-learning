@@ -18,8 +18,8 @@
 #include "yuyv_rgb565.h"
 
 #define BUFFER_COUNT 4
-#define DEFAULT_WIDTH 1024
-#define DEFAULT_HEIGHT 600
+#define DEFAULT_WIDTH 640
+#define DEFAULT_HEIGHT 480
 
 struct video_buffer {
     void *start;

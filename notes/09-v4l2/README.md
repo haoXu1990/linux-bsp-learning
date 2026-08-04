@@ -17,6 +17,8 @@
 9. [完整数据流与典型调用链](architecture/08-完整数据流与典型调用链.md)
 10. [调试工具与常见问题](architecture/09-调试工具与常见问题.md)
 11. [V4L2 理解练习题](architecture/10-V4L2理解练习题.md)
+12. [OV5640 v2 驱动与 i.MX6ULL 摄像头架构分析](architecture/11-ov5640-v2-driver-analysis.md)
+13. [从模块到链路理解 V4L2、Sensor 与 CSI](architecture/12-v4l2-sensor-learning-guide.md)
 
 这套文档以 Linux 4.9 为主。V4L2 的总体模型在后续内核中仍然成立，但异步 subdev、固件节点、部分回调签名和 helper API 有演进；遇到这些位置，文中会给出简短提醒。
 
