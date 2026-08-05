@@ -156,24 +156,22 @@ drivers/media/platform/mxc/capture/mx6s_capture.c
 | `HREF` | `CSI_HSYNC` | 行有效/行同步 |
 | `PD` | `74595_CSI_PWREN` | Power Down/电源控制 |
 | `RST` | `74595_CSI_RST` | Sensor 复位 |
-| MCLK | `CSI_MCLK` | Sensor 参考时钟 |
+| MCLK | 模块板载 24 MHz 振荡器 | Sensor 参考时钟；模块18针接口没有引出 XCLK |
 
-### 2.2 必须确认 MCLK
+### 2.2 本项目的 MCLK 已经确认
 
-原理图 J5 提供了 `CSI_MCLK`，但是照片中的蓝色 OV5640 模块没有明显标出 MCLK 引脚。
+重新核对 OV5640 模块原理图和转接板原理图后确认：
 
-上电前后需要确认至少一项：
+- 模块带有 24.000 MHz 有源振荡器；
+- 振荡器输出直接连接 OV5640 的 XCLK；
+- 模块18针接口没有引出 XCLK，对应位置标为 NC；
+- 转接板虽然从开发板 J5 接入 CSI_MCLK，但摄像头模块侧没有把它送到 Sensor。
 
-1. `100ASK-OV5640-Connector` 已经把 J5 的 MCLK 接到 Sensor；
-2. 蓝色模块背面带有独立的 24 MHz 晶振或振荡器。
+因此，本项目中 OV5640 的真实参考时钟来自模块自身，而不是 i.MX6ULL 的 CSI_MCLK PAD。
 
-如果两者都没有，OV5640 通常无法正常响应 I²C。
+设备树仍保留 clocks、clock-names 和 mclk，是因为当前 4.9 BSP 的 OV5640 V2/V3 驱动会强制获取名为 csi_mclk 的时钟并读取 mclk；删除后会导致 probe 失败。这些属性在本项目中主要用于兼容旧驱动，并不表示 Sensor 的物理 XCLK 来自 SoC。
 
-可以使用示波器测量：
-
-```text
-期望 MCLK：约 24 MHz
-```
+MX6UL_PAD_CSI_MCLK__CSI_MCLK 对当前模块属于冗余 PAD 配置。调试阶段可以先保留，系统稳定后再移除并释放该 PAD。
 
 ### 2.3 PWDN 和 RESET 不是 SoC 直连 GPIO
 
@@ -187,11 +185,15 @@ drivers/media/platform/mxc/capture/mx6s_capture.c
 说明它们由 74HC595 GPIO 扩展器控制，因此设备树使用：
 
 ```dts
-pwn-gpios = <&gpio_spi 6 1>;
-rst-gpios = <&gpio_spi 5 0>;
+pwn-gpios = <&gpio_spi 5 GPIO_ACTIVE_HIGH>;
+rst-gpios = <&gpio_spi 4 GPIO_ACTIVE_LOW>;
 ```
 
-这也是为什么在驱动还没有正确加载时，直接运行 `i2cdetect` 不一定能看到 OV5640：Sensor 可能仍处于 PWDN 或 RESET 状态。
+这里的 5、4 是 74HC595 内部输出位号，不是 i.MX6ULL 原生 GPIO 编号。它们已经通过实际电压和 I²C 地址 0x3c 验证：bit5 控制 PWDN，bit4 控制 RESET。
+
+PWDN 高有效，RESET 低有效，所以使用 GPIO_ACTIVE_HIGH 和 GPIO_ACTIVE_LOW 表达真实电气语义。当前旧驱动使用整数 GPIO 接口并手动输出电平，不会自动利用极性标志，但仍应按真实含义填写，方便阅读和后续升级。
+
+这也是为什么驱动还没有正确加载时，直接运行 `i2cdetect` 不一定能看到 OV5640：Sensor 可能仍处于 PWDN 或 RESET 状态。
 
 ---
 
@@ -361,8 +363,8 @@ i.MX6UL/ULL 的 CSI 内部数据通路为 10 位，官方 8 位摄像头示例�
         clocks = <&clks IMX6UL_CLK_CSI>;
         clock-names = "csi_mclk";
 
-        pwn-gpios = <&gpio_spi 6 1>;
-        rst-gpios = <&gpio_spi 5 0>;
+        pwn-gpios = <&gpio_spi 5 GPIO_ACTIVE_HIGH>;
+        rst-gpios = <&gpio_spi 4 GPIO_ACTIVE_LOW>;
 
         csi_id = <0>;
         mclk = <24000000>;
@@ -402,6 +404,362 @@ reset-gpios
 ```
 
 设备树属性名必须和当前驱动实际读取的名字一致。
+
+### 6.2 先理解：设备树在这条链路中负责什么
+
+设备树负责描述板级事实，而不是保存图像格式算法。对本项目来说，它需要回答：
+
+1. Sensor 挂在哪个 I²C 控制器、地址是多少；
+2. 哪些 PAD 要复用成 DVP 信号；
+3. PWDN、RESET 由谁控制；
+4. 当前使用 DVP 还是 MIPI；
+5. Sensor 的输出端连接到哪个 CSI 接收端；
+6. CSI 控制器是否启用。
+
+YUYV/UYVY、分辨率寄存器表和开关流时序属于驱动逻辑，不由当前设备树选择。
+
+### 6.3 为什么 OV5640 放在 &i2c1 下面
+
+原理图连接为：
+
+~~~text
+OV5640 SCL → I2C1_SCL
+OV5640 SDA → I2C1_SDA
+~~~
+
+因此 OV5640 必须作为 &i2c1 的子节点。设备树中的 i2c1 在 Linux 用户空间通常注册为 /dev/i2c-0，所以使用 i2cdetect -y 0 扫到 0x3c 是正常的；设备树控制器编号和用户空间适配器编号不是同一个编号体系。
+
+### 6.4 compatible 和 reg 分别解决什么问题
+
+~~~dts
+compatible = "ovti,ov5640";
+reg = <0x3c>;
+~~~
+
+- compatible 用于匹配 OV5640 I²C 驱动。当前 V2/V3 驱动的 I²C ID 都是 ov5640，因此保持 ovti,ov5640，不要改成 ovti,ov5640_v3。
+- reg 是 OV5640 的7位 I²C 从地址，只决定控制命令发给总线上的哪个器件。
+- 0x300a、0x300b 是进入 OV5640 以后访问的芯片 ID 寄存器，与 reg = <0x3c> 不是同一层地址。
+
+可以记成：
+
+~~~text
+0x3c        = OV5640 在 I²C 总线上的门牌号
+0x300a/300b = OV5640 内部的芯片 ID 寄存器
+~~~
+
+### 6.5 为什么 Sensor 节点引用 pinctrl_csi1
+
+~~~dts
+pinctrl-names = "default";
+pinctrl-0 = <&pinctrl_csi1>;
+~~~
+
+pinctrl_csi1 定义 PCLK、HSYNC、VSYNC、D0～D7 等 PAD 应复用成 CSI 功能。当前 OV5640 驱动在 probe 时调用 devm_pinctrl_get_select_default()，因此把这个 pinctrl 组挂在 OV5640 节点上，Sensor probe 时就会应用它。
+
+这也与 NXP imx6ull-9x9-evk.dts 的组织方式一致。UART6 和 ECSPI1 中即使还保留旧 pinctrl 定义，只要对应节点为 disabled，就不会在运行时申请 CSI PAD。
+
+### 6.6 为什么时钟属性看起来重复
+
+~~~dts
+clocks = <&clks IMX6UL_CLK_CSI>;
+clock-names = "csi_mclk";
+mclk = <24000000>;
+mclk_source = <0>;
+~~~
+
+它们处在不同层次：
+
+- clocks 引用 i.MX6ULL 时钟控制器中的 CSI 时钟对象；
+- clock-names 必须与驱动中的 devm_clk_get(dev, "csi_mclk") 一致；
+- mclk 是旧驱动期望设置的频率；
+- mclk_source 是旧驱动要求存在的历史属性，当前代码读取后没有继续使用。
+
+本模块实际由板载24 MHz振荡器驱动 XCLK，但旧驱动仍强制读取这些属性，所以为了通过 probe 暂时保留。
+
+### 6.7 csi_id 与 DVP/MIPI 模式如何确定
+
+~~~dts
+csi_id = <0>;
+~~~
+
+i.MX6ULL 当前使用 CSI0，所以填写0。旧驱动要求该属性存在，当前代码读取后基本没有继续使用。
+
+本项目是并行 DVP，因此设备树中故意不写下面两个布尔属性：
+
+~~~dts
+mipi_csi;
+fsl,mipi-mode;
+~~~
+
+- OV5640 V3 驱动发现 mipi_csi 才会进入 MIPI 配置分支；没有该属性就是 DVP。
+- mx6s_capture 发现 fsl,mipi-mode 才会按 MIPI 输入处理；没有该属性就是并行 CSI 输入。
+
+也不要添加 fsl,two-8bit-sensor-mode。它表示特殊的双8位 Sensor 模式，不是“使用一个8位 OV5640”就必须开启的选项。
+
+### 6.8 endpoint 为什么必须双向连接
+
+I²C 子节点只能说明控制通道，不能说明图像数据输出到哪里。两个 endpoint 用于建立数据通道：
+
+~~~text
+OV5640 输出端 ov5640_ep ←→ i.MX6ULL CSI 输入端 csi1_ep
+~~~
+
+mx6s_capture 会遍历 &csi 的 port/endpoint，通过 remote-endpoint 找到远端 OV5640 节点，再把它注册为 V4L2 异步 subdev。
+
+因此，缺少 endpoint 时可能出现这种情况：I²C 能读到芯片 ID，但 Sensor 无法与 CSI capture 组成完整链路，也就不能正常形成对应的 /dev/videoX。
+
+### 6.9 为什么当前不添加总线宽度和采样沿属性
+
+标准视频 endpoint 经常出现：
+
+~~~dts
+bus-width = <8>;
+data-shift = <2>;
+hsync-active = <1>;
+vsync-active = <1>;
+pclk-sample = <1>;
+~~~
+
+这些属性在现代驱动中用于描述并行总线宽度、数据线位置、同步有效电平和 PCLK 采样沿。但是当前 4.9 BSP 的 mx6s_capture.c：
+
+- 只通过 endpoint 查找远端 Sensor；
+- 没有调用 endpoint 总线参数解析函数；
+- 没有读取上述属性；
+- PCLK 采样沿、HSYNC 和 VSYNC 极性是在 CSI 驱动中固定设置的。
+
+所以目前不要为了“配置完整”而盲目添加这些属性。设备树里写了某个属性，并不代表驱动一定使用；必须回到源码确认是否存在对应的 of_property_read、of_get_property 或 endpoint 解析代码。
+
+### 6.10 配置项与使用者对照表
+
+| 设备树内容 | 主要使用者 | 解决的问题 |
+|---|---|---|
+| &i2c1、reg = <0x3c> | I²C核心 | 在正确总线上创建正确地址的器件 |
+| compatible | I²C驱动匹配 | 选择 OV5640 驱动 |
+| pinctrl_csi1 | pinctrl子系统、OV5640 probe | 把物理 PAD 复用成 CSI 信号 |
+| pwn-gpios、rst-gpios | OV5640驱动 | 退出掉电并执行复位 |
+| clocks、clock-names、mclk | OV5640旧驱动 | 满足驱动时钟获取和初始化流程 |
+| 不存在的 mipi_csi | OV5640 V3驱动 | 选择 DVP 分支 |
+| 不存在的 fsl,mipi-mode | mx6s_capture | 选择并行 CSI 输入 |
+| remote-endpoint | V4L2异步框架、mx6s_capture | 把 Sensor subdev 连接到 CSI capture |
+| &csi 的 status = "okay" | 平台总线 | 启用 i.MX6ULL CSI 控制器 |
+
+### 6.11 新手必须先会拆解一行 DTS
+
+以这一行为例：
+
+~~~dts
+ov5640: ov5640@3c {
+~~~
+
+它不是一个完整名字，而是三个语法成分：
+
+~~~text
+ov5640:       ov5640@3c        {
+   │              │            │
+   │              │            └─ 节点内容开始，DTS固定语法
+   │              └─ 节点名（node name）
+   └─ 标签（label）
+~~~
+
+以后看到任何 DTS，都先判断它属于 label、节点名、属性名、属性值还是 phandle 引用，不要把它们当成同一种名字。
+
+#### 6.11.1 ov5640: 是 label，可以改名
+
+~~~dts
+ov5640:
+~~~
+
+冒号前面的是 label，作用是让 DTS 其他位置可以使用 &ov5640 引用这个节点。
+
+它可以改成：
+
+~~~dts
+camera_sensor: ov5640@3c {
+~~~
+
+前提是所有 &ov5640 引用也同步改成 &camera_sensor。当前设备树实际上没有地方引用 &ov5640，因此这个 label 即使删除，当前功能通常也不会变化。
+
+label 主要由设备树编译器 dtc 在编译阶段处理。驱动不会根据字符串 ov5640: 匹配设备。编译成 DTB 后，引用关系会转成 phandle 数字。
+
+#### 6.11.2 ov5640@3c 是节点名，不是 label
+
+~~~text
+ov5640@3c
+   │    │
+   │    └─ unit-address
+   └─ 节点基础名称
+~~~
+
+- ov5640 是描述性节点名称。它最好反映器件类型，但当前 I²C 驱动不靠它匹配。
+- @3c 是 unit-address，应当与 reg = <0x3c> 一致。
+- 真正创建 I²C 设备时，内核读取 compatible 和 reg，而不是依靠 ov5640@3c 这个字符串。
+
+对应源码：
+
+- drivers/i2c/i2c-core.c:1634 调用 of_modalias_node()，根据 compatible 生成设备类型；
+- drivers/i2c/i2c-core.c:1640 读取固定属性 reg；
+- drivers/of/base.c:1073-1078 的 of_modalias_node() 读取 compatible。
+
+因此把节点写成 camera@3c，在语法和匹配层面也可以工作；但本项目沿用官方示例 ov5640@3c，看到节点名就能识别器件。
+
+#### 6.11.3 port 是节点名，而且本驱动要求这个固定名字
+
+~~~dts
+port {
+~~~
+
+这里没有冒号，所以 port 不是 label，而是节点名。
+
+在当前驱动中不能随便改成 camera_port。证据位于：
+
+~~~text
+drivers/media/platform/mxc/capture/mx6s_capture.c:1766-1768
+~~~
+
+核心代码：
+
+~~~c
+for_each_available_child_of_node(parent, node) {
+    if (of_node_cmp(node->name, "port"))
+        continue;
+}
+~~~
+
+驱动逐个检查 &csi 的子节点，只有节点名等于 port 才继续处理。改成别的名字后，驱动会直接 continue，无法继续寻找远端 Sensor。
+
+为什么要配置 port：它表示设备的媒体数据端口，把 I²C 控制关系和 DVP 图像数据关系分开描述。
+
+#### 6.11.4 ov5640_ep: 是 endpoint 的 label，可以改名
+
+~~~dts
+ov5640_ep: endpoint {
+~~~
+
+拆开后是：
+
+~~~text
+ov5640_ep:       endpoint
+     │              │
+     │              └─ 节点名
+     └─ label
+~~~
+
+ov5640_ep 是可以修改的 label。它被 CSI 一侧使用：
+
+~~~dts
+remote-endpoint = <&ov5640_ep>;
+~~~
+
+如果改成 sensor_out_ep，就必须把对面的引用一起改成：
+
+~~~dts
+remote-endpoint = <&sensor_out_ep>;
+~~~
+
+#### 6.11.5 endpoint 是标准节点名，不建议改
+
+endpoint 表示 port 中的一个具体连接点。当前 mx6s_capture.c:1771 使用 of_get_next_child(node, NULL) 取得 port 的第一个子节点，并没有直接比较字符串 endpoint。
+
+但是 endpoint 是 Linux OF graph/media binding 的标准结构名称，其他通用函数和未来驱动都按这种结构理解设备树。因此这里应视为规范固定写法，不要因为当前代码没有比较名字就随意修改。
+
+#### 6.11.6 remote-endpoint 是固定属性名
+
+~~~dts
+remote-endpoint = <&csi1_ep>;
+~~~
+
+remote-endpoint 不是 label，而是属性名。不能改成 remote、peer 或其他名字。
+
+内核固定读取这个字符串，源码位于：
+
+~~~text
+drivers/of/base.c:2462-2469
+~~~
+
+核心代码：
+
+~~~c
+np = of_parse_phandle(node, "remote-endpoint", 0);
+~~~
+
+如果属性名写错，of_parse_phandle() 返回空，mx6s_capture 就找不到远端 OV5640。
+
+#### 6.11.7 <&csi1_ep> 是 phandle 引用
+
+~~~text
+<  &csi1_ep  >
+│      │      │
+│      │      └─ 一个设备树 cell 列表结束
+│      └─ 引用 label csi1_ep
+└─ 一个设备树 cell 列表开始
+~~~
+
+csi1_ep 是 CSI 侧 endpoint 的 label，可以改名。它并不表示“CSI1控制器”，也不决定 csi_id。
+
+例如可以把两边改成更直观的名字：
+
+~~~dts
+sensor_out_ep: endpoint {
+    remote-endpoint = <&csi_in_ep>;
+};
+
+csi_in_ep: endpoint {
+    remote-endpoint = <&sensor_out_ep>;
+};
+~~~
+
+只要引用保持对应，功能不变。
+
+#### 6.11.8 为什么两侧都要配置
+
+Sensor 侧：
+
+~~~dts
+port {
+    ov5640_ep: endpoint {
+        remote-endpoint = <&csi1_ep>;
+    };
+};
+~~~
+
+表示“OV5640 的图像输出端连接到 CSI 输入端”。
+
+CSI 侧：
+
+~~~dts
+port {
+    csi1_ep: endpoint {
+        remote-endpoint = <&ov5640_ep>;
+    };
+};
+~~~
+
+表示“CSI 输入端的远端设备是 OV5640”。
+
+mx6s_capture.c:1767 找到名为 port 的节点，1771取得其中第一个 endpoint，1774调用 of_graph_get_remote_port_parent()。该通用函数在 drivers/of/base.c:2469 读取 remote-endpoint，沿引用找到 OV5640 的设备节点。随后 mx6s_capture 把该节点登记为 V4L2 异步匹配对象。
+
+这两段配置不会传输图像，也不会设置 D0～D7。它们只是在软件中声明：
+
+~~~text
+这个 OV5640 subdev 和这个 mx6s-csi capture 属于同一条视频链路
+~~~
+
+#### 6.11.9 这一组写法的分类总结
+
+| 写法 | 类型 | 能否改名 | 谁使用 |
+|---|---|---|---|
+| ov5640: | label | 可以；引用必须同步修改 | dtc和DTS中的 &ov5640 |
+| ov5640@3c | 节点名 | 基础名可调整；@3c应与reg一致 | 用于设备树层级和可读性 |
+| compatible | 固定属性名 | 不可随便改 | I²C/OF匹配，i2c-core.c:1634 |
+| reg | 固定属性名 | 不可改；值由硬件地址决定 | i2c-core.c:1640 |
+| port | 节点名 | 当前驱动不可改 | mx6s_capture.c:1767 |
+| ov5640_ep: | label | 可以；引用必须同步修改 | 对侧 remote-endpoint |
+| endpoint | 标准节点名 | 不建议改 | OF graph标准结构 |
+| remote-endpoint | 固定属性名 | 不可改 | drivers/of/base.c:2469 |
+| csi1_ep | label | 可以；它不是CSI编号 | dtc解析 &csi1_ep |
+| <&csi1_ep> | phandle引用 | 跟随label修改 | OF graph建立远端关系 |
+
+
 
 ---
 
@@ -447,7 +805,7 @@ csi1_ep {
 
 ## 8. 建议的设备树修改汇总
 
-最终至少包含四类修改：
+最终至少包含五类修改：
 
 ```text
 1. 禁用 &uart6
@@ -925,8 +1283,10 @@ PC上用ffplay查看内容正确
 - [ ] 已添加 `pinctrl_csi1`；
 - [ ] OV5640 位于 `&i2c1`；
 - [ ] I²C 地址为 `0x3c`；
-- [ ] PWDN、RESET 指向 74HC595；
-- [ ] MCLK 设置为24MHz；
+- [ ] PWDN 为 74HC595 bit5，RESET 为 bit4；
+- [ ] 已确认 Sensor 使用模块板载24MHz振荡器；
+- [ ] 为兼容旧驱动保留 csi_mclk 和 mclk = <24000000>；
+- [ ] 未添加 mipi_csi 和 fsl,mipi-mode；
 - [ ] `ov5640_ep` 和 `csi1_ep` 双向连接；
 - [ ] `&csi` 状态为 `okay`。
 
