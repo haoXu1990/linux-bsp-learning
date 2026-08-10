@@ -39,3 +39,24 @@
 - `v4l2-utils`：`v4l2-ctl`、`media-ctl`、`v4l2-compliance`。
 
 > 知乎页面可能受登录或反爬限制；文档中的内核接口结论以 Linux 内核 API/源码和实际课程源码为准。
+
+## 通用分析方法
+
+14. [拿到摄像头后的分析与适配方法](architecture/13-拿到摄像头后的分析与适配方法.md)
+
+这篇用于以后更换Sensor、接口或SoC时复用，不保存某块板子的最终配置。
+
+## 板卡实战
+
+- [i.MX6ULL + OV5640 DVP案例](cases/imx6ull-ov5640/README.md)
+  - DVP适配和调试记录
+  - 内核配置、编译与部署
+  - OV5640、CSI、V4L2和Media源码分析
+  - PXP硬件YUV转RGB与Framebuffer显示
+
+## 本模块的资料边界
+
+- `architecture/`：通用原理和分析方法。
+- `cases/`：具体开发板、Sensor、内核版本和实验结论。
+- 其他子目录：可编译的应用程序、驱动和实验代码。
+- 厂商源码副本和移植包：统一放在仓库的 `hardware/` 下。

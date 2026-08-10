@@ -1,0 +1,223 @@
+[
+    {
+        "arguments": [
+            "arm-linux-gcc",
+            "-c",
+            "-Wall",
+            "-O2",
+            "-g",
+            "-I",
+            "/home/xuhao/work/100ask/linux-bsp-learning/notes/09-v4l2/video2lcd/include",
+            "-Wp,-MD,.convert_manager.o.d",
+            "-o",
+            "convert_manager.o",
+            "convert_manager.c"
+        ],
+        "directory": "/home/xuhao/work/100ask/linux-bsp-learning/notes/09-v4l2/video2lcd/convert",
+        "file": "convert_manager.c"
+    },
+    {
+        "arguments": [
+            "arm-linux-gcc",
+            "-c",
+            "-Wall",
+            "-O2",
+            "-g",
+            "-I",
+            "/home/xuhao/work/100ask/linux-bsp-learning/notes/09-v4l2/video2lcd/include",
+            "-Wp,-MD,.yuv2rgb.o.d",
+            "-o",
+            "yuv2rgb.o",
+            "yuv2rgb.c"
+        ],
+        "directory": "/home/xuhao/work/100ask/linux-bsp-learning/notes/09-v4l2/video2lcd/convert",
+        "file": "yuv2rgb.c"
+    },
+    {
+        "arguments": [
+            "arm-linux-gcc",
+            "-c",
+            "-Wall",
+            "-O2",
+            "-g",
+            "-I",
+            "/home/xuhao/work/100ask/linux-bsp-learning/notes/09-v4l2/video2lcd/include",
+            "-Wp,-MD,.zoom.o.d",
+            "-o",
+            "zoom.o",
+            "zoom.c"
+        ],
+        "directory": "/home/xuhao/work/100ask/linux-bsp-learning/notes/09-v4l2/video2lcd/render/operation",
+        "file": "zoom.c"
+    },
+    {
+        "arguments": [
+            "arm-linux-gcc",
+            "-c",
+            "-Wall",
+            "-O2",
+            "-g",
+            "-I",
+            "/home/xuhao/work/100ask/linux-bsp-learning/notes/09-v4l2/video2lcd/include",
+            "-Wp,-MD,.fb.o.d",
+            "-o",
+            "fb.o",
+            "fb.c"
+        ],
+        "directory": "/home/xuhao/work/100ask/linux-bsp-learning/notes/09-v4l2/video2lcd/display",
+        "file": "fb.c"
+    },
+    {
+        "arguments": [
+            "arm-linux-gcc",
+            "-c",
+            "-Wall",
+            "-O2",
+            "-g",
+            "-I",
+            "/home/xuhao/work/100ask/linux-bsp-learning/notes/09-v4l2/video2lcd/include",
+            "-Wp,-MD,.jdatasrc-tj.o.d",
+            "-o",
+            "jdatasrc-tj.o",
+            "jdatasrc-tj.c"
+        ],
+        "directory": "/home/xuhao/work/100ask/linux-bsp-learning/notes/09-v4l2/video2lcd/convert",
+        "file": "jdatasrc-tj.c"
+    },
+    {
+        "arguments": [
+            "arm-linux-gcc",
+            "-c",
+            "-Wall",
+            "-O2",
+            "-g",
+            "-I",
+            "/home/xuhao/work/100ask/linux-bsp-learning/notes/09-v4l2/video2lcd/include",
+            "-Wp,-MD,.rgb2rgb.o.d",
+            "-o",
+            "rgb2rgb.o",
+            "rgb2rgb.c"
+        ],
+        "directory": "/home/xuhao/work/100ask/linux-bsp-learning/notes/09-v4l2/video2lcd/convert",
+        "file": "rgb2rgb.c"
+    },
+    {
+        "arguments": [
+            "arm-linux-gcc",
+            "-c",
+            "-Wall",
+            "-O2",
+            "-g",
+            "-I",
+            "/home/xuhao/work/100ask/linux-bsp-learning/notes/09-v4l2/video2lcd/include",
+            "-Wp,-MD,.disp_manager.o.d",
+            "-o",
+            "disp_manager.o",
+            "disp_manager.c"
+        ],
+        "directory": "/home/xuhao/work/100ask/linux-bsp-learning/notes/09-v4l2/video2lcd/display",
+        "file": "disp_manager.c"
+    },
+    {
+        "arguments": [
+            "arm-linux-gcc",
+            "-c",
+            "-Wall",
+            "-O2",
+            "-g",
+            "-I",
+            "/home/xuhao/work/100ask/linux-bsp-learning/notes/09-v4l2/video2lcd/include",
+            "-Wp,-MD,.video_manager.o.d",
+            "-o",
+            "video_manager.o",
+            "video_manager.c"
+        ],
+        "directory": "/home/xuhao/work/100ask/linux-bsp-learning/notes/09-v4l2/video2lcd/video",
+        "file": "video_manager.c"
+    },
+    {
+        "arguments": [
+            "arm-linux-gcc",
+            "-c",
+            "-Wall",
+            "-O2",
+            "-g",
+            "-I",
+            "/home/xuhao/work/100ask/linux-bsp-learning/notes/09-v4l2/video2lcd/include",
+            "-Wp,-MD,.main.o.d",
+            "-o",
+            "main.o",
+            "main.c"
+        ],
+        "directory": "/home/xuhao/work/100ask/linux-bsp-learning/notes/09-v4l2/video2lcd",
+        "file": "main.c"
+    },
+    {
+        "arguments": [
+            "arm-linux-gcc",
+            "-c",
+            "-Wall",
+            "-O2",
+            "-g",
+            "-I",
+            "/home/xuhao/work/100ask/linux-bsp-learning/notes/09-v4l2/video2lcd/include",
+            "-Wp,-MD,.mjpeg2rgb.o.d",
+            "-o",
+            "mjpeg2rgb.o",
+            "mjpeg2rgb.c"
+        ],
+        "directory": "/home/xuhao/work/100ask/linux-bsp-learning/notes/09-v4l2/video2lcd/convert",
+        "file": "mjpeg2rgb.c"
+    },
+    {
+        "arguments": [
+            "arm-linux-gcc",
+            "-c",
+            "-Wall",
+            "-O2",
+            "-g",
+            "-I",
+            "/home/xuhao/work/100ask/linux-bsp-learning/notes/09-v4l2/video2lcd/include",
+            "-Wp,-MD,.merge.o.d",
+            "-o",
+            "merge.o",
+            "merge.c"
+        ],
+        "directory": "/home/xuhao/work/100ask/linux-bsp-learning/notes/09-v4l2/video2lcd/render/operation",
+        "file": "merge.c"
+    },
+    {
+        "arguments": [
+            "arm-linux-gcc",
+            "-c",
+            "-Wall",
+            "-O2",
+            "-g",
+            "-I",
+            "/home/xuhao/work/100ask/linux-bsp-learning/notes/09-v4l2/video2lcd/include",
+            "-Wp,-MD,.v4l2.o.d",
+            "-o",
+            "v4l2.o",
+            "v4l2.c"
+        ],
+        "directory": "/home/xuhao/work/100ask/linux-bsp-learning/notes/09-v4l2/video2lcd/video",
+        "file": "v4l2.c"
+    },
+    {
+        "arguments": [
+            "arm-linux-gcc",
+            "-c",
+            "-Wall",
+            "-O2",
+            "-g",
+            "-I",
+            "/home/xuhao/work/100ask/linux-bsp-learning/notes/09-v4l2/video2lcd/include",
+            "-Wp,-MD,.color.o.d",
+            "-o",
+            "color.o",
+            "color.c"
+        ],
+        "directory": "/home/xuhao/work/100ask/linux-bsp-learning/notes/09-v4l2/video2lcd/convert",
+        "file": "color.c"
+    }
+]

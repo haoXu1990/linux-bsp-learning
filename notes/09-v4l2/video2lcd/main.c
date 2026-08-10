@@ -1,173 +1,211 @@
-#include <unistd.h>
-#include <stdlib.h>
-#include <stdio.h>
 #include <config.h>
-#include <disp_manager.h>
-#include <video_manager.h>
 #include <convert_manager.h>
+#include <disp_manager.h>
+#include <pxp.h>
 #include <render.h>
+#include <video_manager.h>
+
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
+static void CalcOutputSize(int iSrcWidth, int iSrcHeight,
+                           int iLcdWidth, int iLcdHeight,
+                           int *piDstWidth, int *piDstHeight)
+{
+    float fScale;
 
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <sys/mman.h>
+    *piDstWidth = iSrcWidth;
+    *piDstHeight = iSrcHeight;
+    if (iSrcWidth <= iLcdWidth && iSrcHeight <= iLcdHeight)
+        return;
 
+    fScale = (float)iLcdWidth / iSrcWidth;
+    if ((float)iLcdHeight / iSrcHeight < fScale)
+        fScale = (float)iLcdHeight / iSrcHeight;
 
-/* video2lcd </dev/video0,1,...> */
+    *piDstWidth = (int)(iSrcWidth * fScale) & ~1;
+    *piDstHeight = (int)(iSrcHeight * fScale) & ~1;
+}
+
+static void PrintUsage(const char *pcProgram)
+{
+    printf("Usage: %s <camera-device> [pxp-device|--cpu]%c",
+           pcProgram, 10);
+    printf("PXP example: %s /dev/video1 /dev/video0%c",
+           pcProgram, 10);
+    printf("CPU compare: %s /dev/video1 --cpu%c",
+           pcProgram, 10);
+}
+
 int main(int argc, char **argv)
-{	
-	int iError;
+{
+    const char *pcPxpDevice = "/dev/video0";
     T_VideoDevice tVideoDevice;
-    PT_VideoConvert ptVideoConvert;
-    int iPixelFormatOfVideo;
-    int iPixelFormatOfDisp;
-
-    PT_VideoBuf ptVideoBufCur;
     T_VideoBuf tVideoBuf;
     T_VideoBuf tConvertBuf;
+    T_VideoBuf tPxpBuf;
     T_VideoBuf tZoomBuf;
     T_VideoBuf tFrameBuf;
-    
-    int iLcdWidth;
-    int iLcdHeigt;
-    int iLcdBpp;
-
-    int iTopLeftX;
-    int iTopLeftY;
-
+    PT_VideoBuf ptVideoBufCur;
+    PT_VideoConvert ptVideoConvert = NULL;
+    int iPixelFormatOfVideo;
+    int iPixelFormatOfDisp;
+    int iPxpOutputFormat;
+    int iLcdWidth, iLcdHeight, iLcdBpp;
+    int iPxpWidth, iPxpHeight;
+    int iTopLeftX, iTopLeftY;
+    int bUsePxp = 1;
+    int iError;
     float k;
-    
-    if (argc != 2)
-    {
-        printf("Usage:\n");
-        printf("%s </dev/video0,1,...>\n", argv[0]);
+
+    if (argc < 2 || argc > 3) {
+        PrintUsage(argv[0]);
         return -1;
     }
-    
-    
+    if (argc == 3) {
+        if (!strcmp(argv[2], "--cpu"))
+            bUsePxp = 0;
+        else
+            pcPxpDevice = argv[2];
+    }
 
-    /* 一系列的初始化 */
-	/* 注册显示设备 */
-	DisplayInit();
-	/* 可能可支持多个显示设备: 选择和初始化指定的显示设备 */
-	SelectAndInitDefaultDispDev("fb");
-    GetDispResolution(&iLcdWidth, &iLcdHeigt, &iLcdBpp);
+    memset(&tVideoDevice, 0, sizeof(tVideoDevice));
+    memset(&tVideoBuf, 0, sizeof(tVideoBuf));
+    memset(&tConvertBuf, 0, sizeof(tConvertBuf));
+    memset(&tPxpBuf, 0, sizeof(tPxpBuf));
+    memset(&tZoomBuf, 0, sizeof(tZoomBuf));
+    memset(&tFrameBuf, 0, sizeof(tFrameBuf));
+
+    DisplayInit();
+    SelectAndInitDefaultDispDev("fb");
+    GetDispResolution(&iLcdWidth, &iLcdHeight, &iLcdBpp);
     GetVideoBufForDisplay(&tFrameBuf);
     iPixelFormatOfDisp = tFrameBuf.iPixelFormat;
 
     VideoInit();
-
     iError = VideoDeviceInit(argv[1], &tVideoDevice);
-    if (iError)
-    {
-        DBG_PRINTF("VideoDeviceInit for %s error!\n", argv[1]);
+    if (iError) {
+        DBG_PRINTF("VideoDeviceInit for %s error!%c", argv[1], 10);
         return -1;
     }
     iPixelFormatOfVideo = tVideoDevice.ptOPr->GetFormat(&tVideoDevice);
 
-    VideoConvertInit();
-    ptVideoConvert = GetVideoConvertForFormats(iPixelFormatOfVideo, iPixelFormatOfDisp);
-    if (NULL == ptVideoConvert)
-    {
-        DBG_PRINTF("can not support this format convert\n");
-        return -1;
+    CalcOutputSize(tVideoDevice.iWidth, tVideoDevice.iHeight,
+                   iLcdWidth, iLcdHeight, &iPxpWidth, &iPxpHeight);
+    iPxpOutputFormat = (iLcdBpp == 16) ?
+                       V4L2_PIX_FMT_RGB565 : V4L2_PIX_FMT_XBGR32;
+
+    if (bUsePxp) {
+        if (iPixelFormatOfVideo != V4L2_PIX_FMT_YUYV ||
+            (iLcdBpp != 16 && iLcdBpp != 32)) {
+            printf("PXP: unsupported input/LCD format, use CPU%c", 10);
+            bUsePxp = 0;
+        } else if (PxpInit(pcPxpDevice,
+                           tVideoDevice.iWidth, tVideoDevice.iHeight,
+                           iPixelFormatOfVideo,
+                           iPxpWidth, iPxpHeight,
+                           iPxpOutputFormat)) {
+            printf("PXP: init failed, fallback to CPU%c", 10);
+            bUsePxp = 0;
+        }
     }
 
-
-    /* 启动摄像头设备 */
-    iError = tVideoDevice.ptOPr->StartDevice(&tVideoDevice);
-    if (iError)
-    {
-        DBG_PRINTF("StartDevice for %s error!\n", argv[1]);
-        return -1;
-    }
-
-    memset(&tVideoBuf, 0, sizeof(tVideoBuf));
-    memset(&tConvertBuf, 0, sizeof(tConvertBuf));
-    tConvertBuf.iPixelFormat     = iPixelFormatOfDisp;
-    tConvertBuf.tPixelDatas.iBpp = iLcdBpp;
-    
-    
-    memset(&tZoomBuf, 0, sizeof(tZoomBuf));
-    
-
-    while (1)
-    {
-        /* 读入摄像头数据 */
-        iError = tVideoDevice.ptOPr->GetFrame(&tVideoDevice, &tVideoBuf);
-        if (iError)
-        {
-            DBG_PRINTF("GetFrame for %s error!\n", argv[1]);
+    if (!bUsePxp) {
+        VideoConvertInit();
+        ptVideoConvert = GetVideoConvertForFormats(iPixelFormatOfVideo,
+                                                   iPixelFormatOfDisp);
+        if (!ptVideoConvert) {
+            DBG_PRINTF("can not support this format convert%c", 10);
             return -1;
         }
-        ptVideoBufCur = &tVideoBuf;
+        printf("video2lcd: CPU conversion path%c", 10);
+    } else {
+        printf("video2lcd: PXP hardware conversion path%c", 10);
+    }
 
-        if (iPixelFormatOfVideo != iPixelFormatOfDisp)
-        {
-            /* 转换为RGB */
-            iError = ptVideoConvert->Convert(&tVideoBuf, &tConvertBuf);
-            DBG_PRINTF("Convert %s, ret = %d\n", ptVideoConvert->name, iError);
-            if (iError)
-            {
-                DBG_PRINTF("Convert for %s error!\n", argv[1]);
-                return -1;
-            }            
-            ptVideoBufCur = &tConvertBuf;
+    iError = tVideoDevice.ptOPr->StartDevice(&tVideoDevice);
+    if (iError) {
+        DBG_PRINTF("StartDevice for %s error!%c", argv[1], 10);
+        PxpExit();
+        return -1;
+    }
+
+    tConvertBuf.iPixelFormat = iPixelFormatOfDisp;
+    tConvertBuf.tPixelDatas.iBpp = iLcdBpp;
+
+    while (1) {
+        iError = tVideoDevice.ptOPr->GetFrame(&tVideoDevice, &tVideoBuf);
+        if (iError) {
+            DBG_PRINTF("GetFrame for %s error!%c", argv[1], 10);
+            break;
         }
-        
 
-        /* 如果图像分辨率大于LCD, 缩放 */
-        if (ptVideoBufCur->tPixelDatas.iWidth > iLcdWidth || ptVideoBufCur->tPixelDatas.iHeight > iLcdHeigt)
-        {
-            /* 确定缩放后的分辨率 */
-            /* 把图片按比例缩放到VideoMem上, 居中显示
-             * 1. 先算出缩放后的大小
-             */
-            k = (float)ptVideoBufCur->tPixelDatas.iHeight / ptVideoBufCur->tPixelDatas.iWidth;
-            tZoomBuf.tPixelDatas.iWidth  = iLcdWidth;
+        if (bUsePxp) {
+            iError = PxpConvert(&tVideoBuf, &tPxpBuf);
+            if (iError) {
+                DBG_PRINTF("PXP convert error%c", 10);
+                tVideoDevice.ptOPr->PutFrame(&tVideoDevice, &tVideoBuf);
+                break;
+            }
+            ptVideoBufCur = &tPxpBuf;
+        } else {
+            ptVideoBufCur = &tVideoBuf;
+            if (iPixelFormatOfVideo != iPixelFormatOfDisp) {
+                iError = ptVideoConvert->Convert(&tVideoBuf, &tConvertBuf);
+                if (iError) {
+                    DBG_PRINTF("CPU convert error%c", 10);
+                    tVideoDevice.ptOPr->PutFrame(&tVideoDevice, &tVideoBuf);
+                    break;
+                }
+                ptVideoBufCur = &tConvertBuf;
+            }
+        }
+
+        if (!bUsePxp &&
+            (ptVideoBufCur->tPixelDatas.iWidth > iLcdWidth ||
+             ptVideoBufCur->tPixelDatas.iHeight > iLcdHeight)) {
+            k = (float)ptVideoBufCur->tPixelDatas.iHeight /
+                ptVideoBufCur->tPixelDatas.iWidth;
+            tZoomBuf.tPixelDatas.iWidth = iLcdWidth;
             tZoomBuf.tPixelDatas.iHeight = iLcdWidth * k;
-            if ( tZoomBuf.tPixelDatas.iHeight > iLcdHeigt)
-            {
-                tZoomBuf.tPixelDatas.iWidth  = iLcdHeigt / k;
-                tZoomBuf.tPixelDatas.iHeight = iLcdHeigt;
+            if (tZoomBuf.tPixelDatas.iHeight > iLcdHeight) {
+                tZoomBuf.tPixelDatas.iWidth = iLcdHeight / k;
+                tZoomBuf.tPixelDatas.iHeight = iLcdHeight;
             }
-            tZoomBuf.tPixelDatas.iBpp        = iLcdBpp;
-            tZoomBuf.tPixelDatas.iLineBytes  = tZoomBuf.tPixelDatas.iWidth * tZoomBuf.tPixelDatas.iBpp / 8;
-            tZoomBuf.tPixelDatas.iTotalBytes = tZoomBuf.tPixelDatas.iLineBytes * tZoomBuf.tPixelDatas.iHeight;
-
+            tZoomBuf.tPixelDatas.iBpp = iLcdBpp;
+            tZoomBuf.tPixelDatas.iLineBytes =
+                tZoomBuf.tPixelDatas.iWidth * iLcdBpp / 8;
+            tZoomBuf.tPixelDatas.iTotalBytes =
+                tZoomBuf.tPixelDatas.iLineBytes *
+                tZoomBuf.tPixelDatas.iHeight;
             if (!tZoomBuf.tPixelDatas.aucPixelDatas)
-            {
-                tZoomBuf.tPixelDatas.aucPixelDatas = malloc(tZoomBuf.tPixelDatas.iTotalBytes);
-            }
-            
+                tZoomBuf.tPixelDatas.aucPixelDatas =
+                    malloc(tZoomBuf.tPixelDatas.iTotalBytes);
             PicZoom(&ptVideoBufCur->tPixelDatas, &tZoomBuf.tPixelDatas);
             ptVideoBufCur = &tZoomBuf;
         }
 
-        /* 合并进framebuffer */
-        /* 接着算出居中显示时左上角坐标 */
-        iTopLeftX = (iLcdWidth - ptVideoBufCur->tPixelDatas.iWidth) / 2;
-        iTopLeftY = (iLcdHeigt - ptVideoBufCur->tPixelDatas.iHeight) / 2;
-
-        PicMerge(iTopLeftX, iTopLeftY, &ptVideoBufCur->tPixelDatas, &tFrameBuf.tPixelDatas);
-
+        iTopLeftX =
+            (iLcdWidth - ptVideoBufCur->tPixelDatas.iWidth) / 2;
+        iTopLeftY =
+            (iLcdHeight - ptVideoBufCur->tPixelDatas.iHeight) / 2;
+        PicMerge(iTopLeftX, iTopLeftY,
+                 &ptVideoBufCur->tPixelDatas, &tFrameBuf.tPixelDatas);
         FlushPixelDatasToDev(&tFrameBuf.tPixelDatas);
 
+        if (bUsePxp)
+            PxpPutBuffer();
         iError = tVideoDevice.ptOPr->PutFrame(&tVideoDevice, &tVideoBuf);
-        if (iError)
-        {
-            DBG_PRINTF("PutFrame for %s error!\n", argv[1]);
-            return -1;
-        }                    
-
-        /* 把framebuffer的数据刷到LCD上, 显示 */
+        if (iError) {
+            DBG_PRINTF("PutFrame for %s error!%c", argv[1], 10);
+            break;
+        }
     }
-		
-	return 0;
-}
 
+    tVideoDevice.ptOPr->StopDevice(&tVideoDevice);
+    tVideoDevice.ptOPr->ExitDevice(&tVideoDevice);
+    PxpExit();
+    free(tZoomBuf.tPixelDatas.aucPixelDatas);
+    return -1;
+}

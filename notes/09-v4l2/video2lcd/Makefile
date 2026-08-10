@@ -32,6 +32,7 @@ obj-y += convert/
 obj-y += display/
 obj-y += render/
 obj-y += video/
+obj-y += pxp/
 
 all : 
 	make -C ./ -f $(TOPDIR)/Makefile.build
