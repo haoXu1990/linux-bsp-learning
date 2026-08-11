@@ -146,8 +146,6 @@ int PxpDisplayFrame(const T_VideoBuf *ptVideoBuf)
         (unsigned long)ptVideoBuf->tPixelDatas.aucPixelDatas;
     tBuf.length = ptVideoBuf->tPixelDatas.iTotalBytes;
     tBuf.bytesused = ptVideoBuf->tPixelDatas.iTotalBytes;
-
-    // 把数据交给 PXP
     if (ioctl(g_iPxpFd, VIDIOC_QBUF, &tBuf) < 0) {
         perror("PXP: QBUF");
         return -1;
@@ -165,8 +163,6 @@ int PxpDisplayFrame(const T_VideoBuf *ptVideoBuf)
     memset(&tBuf, 0, sizeof(tBuf));
     tBuf.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
     tBuf.memory = V4L2_MEMORY_USERPTR;
-
-    // PXP 处理数据完成了
     if (ioctl(g_iPxpFd, VIDIOC_DQBUF, &tBuf) < 0) {
         perror("PXP: DQBUF");
         return -1;

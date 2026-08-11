@@ -167,7 +167,7 @@ Buffer 0～3：已创建，状态为“尚未排队”
 
 ---
 
-### 2.6 `QUERYBUF + mmap`：取得Buffer说明和APP访问地址
+### 2.6 `VIDIOC_QUERYBUF + mmap`：取得Buffer说明和APP访问地址
 
 `QUERYBUF`查询某个index对应Buffer的长度和MMAP偏移：
 
@@ -206,7 +206,7 @@ CSI DMA写完后，APP可直接读取映射地址，不需要驱动再`copy_to_u
 
 ---
 
-### 2.7 `QBUF`：把空Buffer交给采集系统
+### 2.7 `VIDIOC_QBUF`：把空Buffer交给采集系统
 
 > `QBUF`不是取图像，而是告诉驱动：“这块Buffer是空的，可以装下一帧。”
 

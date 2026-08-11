@@ -1,5 +1,6 @@
-main.o: main.c \
+rgb2rgb.o: rgb2rgb.c \
  /home/xuhao/work/100ask/imx6ull/100ask_imx6ull-sdk/ToolChain/arm-buildroot-linux-gnueabihf_sdk-buildroot/arm-buildroot-linux-gnueabihf/sysroot/usr/include/stdc-predef.h \
+ /home/xuhao/work/100ask/linux-bsp-learning/notes/09-v4l2/video2lcd/include/convert_manager.h \
  /home/xuhao/work/100ask/linux-bsp-learning/notes/09-v4l2/video2lcd/include/config.h \
  /home/xuhao/work/100ask/imx6ull/100ask_imx6ull-sdk/ToolChain/arm-buildroot-linux-gnueabihf_sdk-buildroot/arm-buildroot-linux-gnueabihf/sysroot/usr/include/stdio.h \
  /home/xuhao/work/100ask/imx6ull/100ask_imx6ull-sdk/ToolChain/arm-buildroot-linux-gnueabihf_sdk-buildroot/arm-buildroot-linux-gnueabihf/sysroot/usr/include/bits/libc-header-start.h \
@@ -24,7 +25,6 @@ main.o: main.c \
  /home/xuhao/work/100ask/imx6ull/100ask_imx6ull-sdk/ToolChain/arm-buildroot-linux-gnueabihf_sdk-buildroot/arm-buildroot-linux-gnueabihf/sysroot/usr/include/bits/stdio_lim.h \
  /home/xuhao/work/100ask/imx6ull/100ask_imx6ull-sdk/ToolChain/arm-buildroot-linux-gnueabihf_sdk-buildroot/arm-buildroot-linux-gnueabihf/sysroot/usr/include/bits/sys_errlist.h \
  /home/xuhao/work/100ask/imx6ull/100ask_imx6ull-sdk/ToolChain/arm-buildroot-linux-gnueabihf_sdk-buildroot/arm-buildroot-linux-gnueabihf/sysroot/usr/include/bits/stdio.h \
- /home/xuhao/work/100ask/linux-bsp-learning/notes/09-v4l2/video2lcd/include/convert_manager.h \
  /home/xuhao/work/100ask/linux-bsp-learning/notes/09-v4l2/video2lcd/include/video_manager.h \
  /home/xuhao/work/100ask/linux-bsp-learning/notes/09-v4l2/video2lcd/include/pic_operation.h \
  /home/xuhao/work/100ask/imx6ull/100ask_imx6ull-sdk/ToolChain/arm-buildroot-linux-gnueabihf_sdk-buildroot/arm-buildroot-linux-gnueabihf/sysroot/usr/include/linux/videodev2.h \
@@ -50,9 +50,6 @@ main.o: main.c \
  /home/xuhao/work/100ask/imx6ull/100ask_imx6ull-sdk/ToolChain/arm-buildroot-linux-gnueabihf_sdk-buildroot/arm-buildroot-linux-gnueabihf/sysroot/usr/include/asm-generic/posix_types.h \
  /home/xuhao/work/100ask/imx6ull/100ask_imx6ull-sdk/ToolChain/arm-buildroot-linux-gnueabihf_sdk-buildroot/arm-buildroot-linux-gnueabihf/sysroot/usr/include/linux/v4l2-common.h \
  /home/xuhao/work/100ask/imx6ull/100ask_imx6ull-sdk/ToolChain/arm-buildroot-linux-gnueabihf_sdk-buildroot/arm-buildroot-linux-gnueabihf/sysroot/usr/include/linux/v4l2-controls.h \
- /home/xuhao/work/100ask/linux-bsp-learning/notes/09-v4l2/video2lcd/include/disp_manager.h \
- /home/xuhao/work/100ask/linux-bsp-learning/notes/09-v4l2/video2lcd/include/pxp.h \
- /home/xuhao/work/100ask/linux-bsp-learning/notes/09-v4l2/video2lcd/include/render.h \
  /home/xuhao/work/100ask/imx6ull/100ask_imx6ull-sdk/ToolChain/arm-buildroot-linux-gnueabihf_sdk-buildroot/arm-buildroot-linux-gnueabihf/sysroot/usr/include/stdlib.h \
  /home/xuhao/work/100ask/imx6ull/100ask_imx6ull-sdk/ToolChain/arm-buildroot-linux-gnueabihf_sdk-buildroot/arm-buildroot-linux-gnueabihf/sysroot/usr/include/bits/waitflags.h \
  /home/xuhao/work/100ask/imx6ull/100ask_imx6ull-sdk/ToolChain/arm-buildroot-linux-gnueabihf_sdk-buildroot/arm-buildroot-linux-gnueabihf/sysroot/usr/include/bits/waitstatus.h \

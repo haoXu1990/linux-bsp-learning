@@ -134,10 +134,7 @@ int main(int argc, char **argv)
             iError = PxpDisplayFrame(&tVideoBuf);
             if (iError) {
                 DBG_PRINTF("PXP display frame error%c", 10);
-                /*
-                 * PXP may still own this USERPTR after QBUF.
-                 * Release PXP before returning the CSI buffer.
-                 */
+                // xian close  pxp
                 PxpExit();
                 tVideoDevice.ptOPr->PutFrame(&tVideoDevice, &tVideoBuf);
                 break;
