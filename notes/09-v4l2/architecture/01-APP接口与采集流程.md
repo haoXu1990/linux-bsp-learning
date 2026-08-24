@@ -106,7 +106,7 @@ if (ioctl(fd, VIDIOC_S_FMT, &fmt) < 0)
 /* 后续必须使用驱动返回的 fmt，而非原始请求值 */
 ```
 
-### 2.5 `REQBUFS`：建立Buffer池
+### 2.5 `VIDIOC_REQBUFS`：建立Buffer池
 
 先记一句话：
 
